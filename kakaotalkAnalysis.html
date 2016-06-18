@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>카카오톡 대화분석 차트</title>
+        <script src="./lib/Chart.min.js"></script>
+        <style>
+            #loading {
+                display: none;
+                position: absolute;
+            }
+
+            #title {
+                text-align: center;
+            }
+            
+            #loading {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                margin-left: -100px;
+                margin-top: -100px;
+            }
+        </style>
+    </head>
+    <body>
+        <div><input type="file" id="loadKakaoTalk" accept="text/plain"></div>
+        <h2 id="title"></h2>
+        <div id="myChart">
+            <canvas id="chatOccupyChart"></canvas>
+            <canvas id="wordTopTenChart"></canvas>
+            <canvas id="chatTimeChart"></canvas>
+        </div>
+        <div id="loading"><img src="loading_spinner.gif"></div>
+        <script>
+            (function() {
+                var loadKakaoTalk = document.getElementById('loadKakaoTalk');
+                var fileReader = new FileReader();
+
+                loadKakaoTalk.addEventListener('change', function() {
+                    var file = this.files[0];
+                    fileReader.readAsText(file, 'utf-8');
+                });
+
+                fileReader.addEventListener('load', e => {
+                    kakaoTalkAnalysis(e.target.result, () => {
+                        kakaoTalkAnalysisStart();
+                    }, data => {
+                        kakaoTalkAnalysisEnd(data.chatLength);
+                        mostChatUser(data.users);
+                        mostChatWord(data.mostUsedWords);
+                        chatTime(data.chatTimes);
+                    });
+                });
+                
+                function nextRandRGB() {
+                    return 'rgb(' + parseInt(Math.random() * 256) + ', ' + parseInt(Math.random() * 256) + ', ' + parseInt(Math.random() * 256) + ')';
+                }
+                
+                function mostChatUser(users) {
+                    var ctx = document.getElementById('chatOccupyChart');
+                    ctx.style.width = '50%';
+                    
+                    var data = {
+                        labels: [],
+                        datasets: [{data: [], backgroundColor: []}]
+                    };
+
+                    for (var key in users) {
+                        data.labels.push(key);
+                        data.datasets[0].data.push(users[key].occupy);
+                        data.datasets[0].backgroundColor.push(nextRandRGB());
+                    }
+
+                    var myPieChart = new Chart(ctx,{
+                        type: 'pie',
+                        data: data,
+                        options: {
+                         //   responsive: false,
+                            title: {
+                                display: true,
+                                text: '채팅 점유율'
+                            }
+                        }
+                    });
+                }
+                
+                function mostChatWord(mostUsedWords) {
+                    var ctx = document.getElementById('wordTopTenChart');
+
+                    var data = {
+                        labels: [],
+                        datasets: [{data: [], backgroundColor: []}]
+                    };
+
+                    for (var key in mostUsedWords) {
+                        data.labels.push(key);
+                        data.datasets[0].data.push(mostUsedWords[key]);
+                        data.datasets[0].backgroundColor.push(nextRandRGB());
+                    }
+
+                    var myPieChart = new Chart(ctx,{
+                        type: 'pie',
+                        data: data,
+                        options: {
+                          //  responsive: false,
+                            title: {
+                                display: true,
+                                text: '가장 많이 쓰인 채팅 TOP 10'
+                            }
+                        }
+                    });
+                }
+                
+                function chatTime(chatTimes) {
+                    var ctx = document.getElementById('chatTimeChart');
+
+                    var data = {
+                        labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                        datasets: [
+                            {
+                                label: '오전',
+                                data: [],
+                                fill: false,
+                                lineTension: 0.1,
+                                backgroundColor: "rgba(75,192,192,0.4)",
+                                borderColor: "rgba(75,192,192,1)",
+                                borderCapStyle: 'butt',
+                                borderDash: [],
+                                borderDashOffset: 0.0,
+                                borderJoinStyle: 'miter'
+                            }, {
+                                label: '오후',
+                                data: [],
+                                fill: false,
+                                lineTension: 0.1,
+                                backgroundColor: "rgba(10,132,192,0.4)",
+                                borderColor: "rgba(10,132,192,1)",
+                                borderCapStyle: 'butt',
+                                borderDash: [],
+                                borderDashOffset: 0.0,
+                                borderJoinStyle: 'miter'
+                            }
+                        ]
+                    };
+
+                    var time = chatTimes['오전'];
+                    
+                    for (var hour of time) {
+                        data.datasets[0].data.push(hour);   
+                    }
+                    
+                    time = chatTimes['오후'];
+                    
+                    for (var hour of time) {
+                        data.datasets[1].data.push(hour);   
+                    }
+
+                    var myLineChart = new Chart(ctx,{
+                        type: 'line',
+                        data: data,
+                        options: {
+                            //responsive: false,
+                            title: {
+                                display: true,
+                                text: '시간별 채팅 분포'
+                            }
+                        }
+                    });
+                }    
+                
+                function kakaoTalkAnalysisStart() {
+                    //document.getElementById('myChart').innerHTML = '';
+                    document.getElementById('myChart').style.display = 'none';
+                    document.getElementById('loading').style.display = 'block';
+                    document.getElementById('title').innerHTML = '데이터를 분석중입니다...';
+                    loadKakaoTalk.setAttribute('disabled', 'disabled');
+                }
+                
+                function kakaoTalkAnalysisEnd(chatLength) {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('title').innerHTML = '총 ' + chatLength + '개의 데이터를 분석한 결과';   
+                    document.getElementById('myChart').style.display = 'block';
+                    loadKakaoTalk.removeAttribute('disabled');
+                }
+                
+                function kakaoTalkAnalysis(txt, startCallback, endCallback) {   
+                    startCallback();
+
+                    setTimeout(() => {
+                        var kakaoData = txt.split('\n');
+                        var results = {
+                            users: {},
+                            chatLength: 0,
+                            mostUsedWords: {},
+                            chatTimes: {'오전': [], '오후': []}
+                        };
+                        
+                        kakaoData.forEach((data, i) => {
+                            var pattern = new RegExp(/^[[\s\S]+] [[가-힣]+ \d+:\d+] /);
+                            var chat = pattern.exec(data);
+                            if (chat) {
+                                var name = chat[0].split('[')[1].split(']')[0];
+                                var date = chat[0].split('[')[2].split(']')[0];
+                                var content = data.replace(chat, '');
+
+                                if (!results.users[name]) {
+                                    results.users[name] = {};
+                                    results.users[name].name = name;
+                                    results.users[name].messages = [];
+                                }
+
+                                results.users[name].messages.push({
+                                    name: name,
+                                    date: date,
+                                    content: content
+                                });
+
+                                results.chatLength++;
+                            }
+                        });
+
+                        for (var key in results.users) {
+                            var user = results.users[key];
+                            user.occupy = (user.messages.length / results.chatLength * 100).toFixed(1);
+                        }
+
+                        var usedWords = {};
+
+                        for (var key in results.users) {
+                            var user = results.users[key];
+                            
+                            user.messages.forEach((message, i) => {
+                            if (!usedWords[message.content])
+                                usedWords[message.content] = 0;
+                                usedWords[message.content]++;
+                            });
+                        }
+
+                        var count = 0;
+
+                        for (var key in usedWords) {
+                            var top = key;
+                            
+                            for (var key2 in usedWords) {
+                                if (usedWords[top] < usedWords[key2]) {
+                                    top = key2;
+                                }
+                            }
+                            results.mostUsedWords[top] = usedWords[top];
+                            usedWords[top] = 0;
+                        
+                            if (++count == 10) break;
+                        }
+
+                        for (var key in results.users) {
+                            var user = results.users[key];
+                            
+                            user.messages.forEach((message, i) => {
+                                var date = message.date;
+                                var time = parseInt(date.substr(3, 2));
+
+                                if (!results.chatTimes[date.substr(0, 2)][time - 1])
+                                    results.chatTimes[date.substr(0, 2)][time - 1] = 0;
+                                results.chatTimes[date.substr(0, 2)][time - 1]++;
+                            });
+                        }
+
+                        endCallback(results);
+                    }, 1000);
+                }
+            })();
+        </script>
+    </body>
+</html>
