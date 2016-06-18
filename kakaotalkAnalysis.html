@@ -198,6 +198,7 @@
                         kakaoData.forEach((data, i) => {
                             var pattern = new RegExp(/^[[\s\S]+] [[가-힣]+ \d+:\d+] /);
                             var chat = pattern.exec(data);
+                            
                             if (chat) {
                                 var name = chat[0].split('[')[1].split(']')[0];
                                 var date = chat[0].split('[')[2].split(']')[0];
@@ -230,8 +231,8 @@
                             var user = results.users[key];
                             
                             user.messages.forEach((message, i) => {
-                            if (!usedWords[message.content])
-                                usedWords[message.content] = 0;
+                                if (!usedWords[message.content])
+                                    usedWords[message.content] = 0;
                                 usedWords[message.content]++;
                             });
                         }
